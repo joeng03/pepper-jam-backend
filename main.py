@@ -2,7 +2,7 @@ from fastapi import FastAPI, File, UploadFile
 from fastapi.responses import FileResponse
 from contextlib import asynccontextmanager
 import uvicorn
-import pickle
+import tempfile
 import whisper
 from utils import video_to_audio
 
@@ -23,8 +23,17 @@ def index():
 
 
 @app.post("/transcribe/")
-async def upload_video(video: UploadFile = File(...)):
-    video_to_audio("temp_video.mp4", video.file)
+async def transribe(video: UploadFile = File(...)):
+    # # Save the uploaded video file to a temporary file
+    with open("temp_video.mp4", "wb") as buffer:
+        buffer.write(await video.read())
 
     # Return the video file as a response
     return FileResponse("temp_video.mp4", media_type="video/mp4")
+    # with tempfile.d(delete=False, suffix=".wav") as temp_audio:
+    #     temp_audio_path = temp_audio.name
+
+    # video_to_audio(await video.read(), temp_audio_path)
+
+    # # Return the video file as a response
+    # return FileResponse(temp_audio_path, media_type="audio/wav", filename="output_audio.wav")
