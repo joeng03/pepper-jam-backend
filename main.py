@@ -1,6 +1,7 @@
 from fastapi import FastAPI, File, UploadFile
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from contextlib import asynccontextmanager
+import io
 import uvicorn
 import tempfile
 import whisper
@@ -24,12 +25,17 @@ def index():
 
 @app.post("/transcribe/")
 async def transribe(video: UploadFile = File(...)):
-    # # Save the uploaded video file to a temporary file
-    with open("temp_video.mp4", "wb") as buffer:
-        buffer.write(await video.read())
+    video_bytes = await video.read()
 
-    # Return the video file as a response
-    return FileResponse("temp_video.mp4", media_type="video/mp4")
+    # Convert video bytes to audio bytes
+    audio_bytes = video_to_audio(video_bytes)
+
+    # Return the audio file as a streaming response
+    return StreamingResponse(io.BytesIO(audio_bytes), media_type="audio/wav")
+
+
+    
+
     # with tempfile.d(delete=False, suffix=".wav") as temp_audio:
     #     temp_audio_path = temp_audio.name
 
