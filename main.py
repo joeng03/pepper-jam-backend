@@ -30,8 +30,14 @@ async def transribe(video: UploadFile = File(...)):
     # Convert video bytes to audio bytes
     audio_bytes = video_to_audio(video_bytes)
 
+    # Save audio bytes to a file
+    with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as temp_audio:
+        temp_audio.write(audio_bytes)
+        temp_audio.seek(0)
+
     # Return the audio file as a streaming response
-    return StreamingResponse(io.BytesIO(audio_bytes), media_type="audio/wav")
+    return FileResponse(temp_audio.name, media_type="audio/wav", filename="output_audio.wav")
+    # return StreamingResponse(io.BytesIO(audio_bytes), media_type="audio/wav")
 
 
     
