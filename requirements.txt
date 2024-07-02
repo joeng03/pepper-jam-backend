@@ -1,4 +1,6 @@
 fastapi
 uvicorn
 ffmpeg-python
+aiofiles
+google-cloud-translate
 git+https://github.com/openai/whisper.git
