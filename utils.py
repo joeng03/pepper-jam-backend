@@ -22,9 +22,6 @@ import io
 
 def video_to_audio(input_bytes: bytes) -> bytes:
     # Use ffmpeg to convert video bytes to audio bytes
-    input_stream = io.BytesIO(input_bytes)
-    output_stream = io.BytesIO()
-    
     process = (
         ffmpeg
         .input('pipe:0')
@@ -32,7 +29,8 @@ def video_to_audio(input_bytes: bytes) -> bytes:
         .run_async(pipe_stdin=True, pipe_stdout=True, pipe_stderr=True)
     )
 
-    stdout, _ = process.communicate(input=input_stream.read())
-    output_stream.write(stdout)
-    output_stream.seek(0)
-    return output_stream.read()
+    stdout, _ = process.communicate(input=input_bytes)
+    if process.returncode != 0:
+        raise ffmpeg.Error('ffmpeg', process.returncode, process.stderr)
+    
+    return stdout
