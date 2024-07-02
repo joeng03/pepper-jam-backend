@@ -2,10 +2,13 @@ from fastapi import FastAPI, File, UploadFile
 from fastapi.responses import FileResponse, StreamingResponse
 from contextlib import asynccontextmanager
 import io
+from pydantic import BaseModel
 import uvicorn
 import tempfile
 import whisper
 from utils import video_to_audio
+import aiofiles
+from google.cloud import translate_v2 as translate
 
 models = {}
 
@@ -24,7 +27,7 @@ def index():
 
 
 @app.post("/transcribe/")
-async def transribe(video: UploadFile = File(...)):
+async def transcribe(video: UploadFile = File(...)):
     video_bytes = await video.read()
 
     # Convert video bytes to audio bytes
@@ -37,10 +40,23 @@ async def transribe(video: UploadFile = File(...)):
 
     # Return the audio file as a streaming response
     return FileResponse(temp_audio.name, media_type="audio/wav", filename="output_audio.wav")
-    # return StreamingResponse(io.BytesIO(audio_bytes), media_type="audio/wav")
+
+class TranslateRequest(BaseModel):
+    text: str
+    target_language: str
 
 
+@app.post("/translate")
+async def translate_fn(translationRequest: TranslateRequest):
+    translate_client = translate.Client()
     
+    text = translationRequest.text
+    if isinstance(text, bytes):
+        text = text.decode("utf-8")
+    result = translate_client.translate(text, target_language=translationRequest.target_language)
+    
+    return result['translatedText']
+
 
     # with tempfile.d(delete=False, suffix=".wav") as temp_audio:
     #     temp_audio_path = temp_audio.name
