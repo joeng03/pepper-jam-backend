@@ -12,12 +12,23 @@ from google.cloud import translate_v2 as translate
 
 
 class TranscribeRequest(BaseModel):
+    fromLang: str
     video: UploadFile = File(...)
-    language: str
+
+class TranscribeResponse(BaseModel):
+    id: str
+    captions: str
 
 class TranslateRequest(BaseModel):
-    text: str
-    target_language: str
+    id: str
+    captions: str
+    toLang: str
+
+class TranslateResponse(BaseModel):
+    id: str
+    toLang: str
+    translation: str
+
 
 
 models = {}
@@ -42,13 +53,18 @@ async def transcribe(transcribeRequest: TranscribeRequest):
     id = utils.generate_id()
 
     utils.video_to_audio(video_bytes, f"temp/{id}.wav")
-    return utils.audio_to_text(models["transriber"], f"temp/{id}.wav", transcribeRequest.language)
-
+    return TranscribeResponse(
+        id=id,
+        captions=utils.audio_to_text(models["transriber"], f"temp/{id}.wav", transcribeRequest.fromLang),
+    )
 
 @app.post("/translate")
 async def translate_fn(translationRequest: TranslateRequest):
-    return utils.translate(translationRequest.text, translationRequest.target_language)
-
+    return TranscribeResponse(
+        id=translationRequest.id,
+        toLang=translationRequest.toLang,
+        translation=utils.translate(translationRequest.captions, translationRequest.toLang),
+    )
 
     # with tempfile.d(delete=False, suffix=".wav") as temp_audio:
     #     temp_audio_path = temp_audio.name
