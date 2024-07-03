@@ -6,9 +6,19 @@ from pydantic import BaseModel
 import uvicorn
 import tempfile
 import whisper
-from utils import video_to_audio
+import utils
 import aiofiles
 from google.cloud import translate_v2 as translate
+
+
+class TranscribeRequest(BaseModel):
+    video: UploadFile = File(...)
+    language: str
+
+class TranslateRequest(BaseModel):
+    text: str
+    target_language: str
+
 
 models = {}
 
@@ -27,35 +37,17 @@ def index():
 
 
 @app.post("/transcribe/")
-async def transcribe(video: UploadFile = File(...)):
-    video_bytes = await video.read()
+async def transcribe(transcribeRequest: TranscribeRequest):
+    video_bytes = await transcribeRequest.video.read()
+    id = utils.generate_id()
 
-    # Convert video bytes to audio bytes
-    audio_bytes = video_to_audio(video_bytes)
-
-    # Save audio bytes to a file
-    with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as temp_audio:
-        temp_audio.write(audio_bytes)
-        temp_audio.seek(0)
-
-    # Return the audio file as a streaming response
-    return FileResponse(temp_audio.name, media_type="audio/wav", filename="output_audio.wav")
-
-class TranslateRequest(BaseModel):
-    text: str
-    target_language: str
+    utils.video_to_audio(video_bytes, f"temp/{id}.wav")
+    return utils.audio_to_text(models["transriber"], f"temp/{id}.wav", transcribeRequest.language)
 
 
 @app.post("/translate")
 async def translate_fn(translationRequest: TranslateRequest):
-    translate_client = translate.Client()
-    
-    text = translationRequest.text
-    if isinstance(text, bytes):
-        text = text.decode("utf-8")
-    result = translate_client.translate(text, target_language=translationRequest.target_language)
-    
-    return result['translatedText']
+    return utils.translate(translationRequest.text, translationRequest.target_language)
 
 
     # with tempfile.d(delete=False, suffix=".wav") as temp_audio:

@@ -2,7 +2,7 @@ fastapi
 uvicorn
 ffmpeg-python
 aiofiles
-google-cloud-translate
 TTS
 torch
+googletrans
 git+https://github.com/openai/whisper.git
