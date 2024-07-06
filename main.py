@@ -58,28 +58,28 @@ def index():
 
 
 @app.post("/transcribe/")
-async def transcribe(transcribeRequest: TranscribeRequest):
-    video_bytes = await transcribeRequest.video.read()
+async def transcribe(video: UploadFile = File(...), fromLang: str = Form(...)):
+    video_bytes = await video.read()
     id = utils.generate_id()
 
     utils.video_to_audio(video_bytes, f"temp/{id}.wav")
     return TranscribeResponse(
         id=id,
-        captions=utils.audio_to_text(models["transriber"], f"temp/{id}.wav", transcribeRequest.fromLang),
+        captions=utils.audio_to_text(models["transcriber"], f"temp/{id}.wav", fromLang),
     )
 
 @app.post("/transcribe_text")
 async def transcribe_text(video: UploadFile = File(...)):
     video_bytes = await video.read()
-    audio_bytes = utils.video_to_audio(video_bytes)
 
-    with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as audio_path:
-
-        # audio_path = os.path.join(temp_dir, "input_audio.wav")
-        audio_path.write(audio_bytes)
-        audio_path.seek(0)
-        
-        result = model.transcribe(audio=audio_path.name)
+    id = utils.generate_id()
+    with tempfile.TemporaryDirectory() as temp_dir:
+        audio_path = os.path.join(temp_dir, f"{id}.wav")
+        audio_bytes = utils.video_to_audio(video_bytes, audio_path)
+        # audio_path.write(audio_bytes)
+        # audio_path.seek(0)
+    
+        result = model.transcribe(audio=audio_path)
 
     return result["text"]
     
@@ -114,39 +114,45 @@ async def translate_fn(translationRequest: TranslateRequest):
 async def synthesise(video: UploadFile = File(...), translated_text: Optional[str] = Form("")):
 
     try:
-        with tempfile.TemporaryDirectory() as temp_dir:
-            video_path = os.path.join(temp_dir, "input_video.mp4")
-            audio_path = os.path.join(temp_dir, "input_audio.wav")
-            output_path = os.path.join(temp_dir, "output_video.mp4")
-
-            with open(video_path, "wb") as f:
-                shutil.copyfileobj(video.file, f)
-
+        id = utils.generate_id()
+        video_bytes = await video.read()
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as temp_file:
+            audio_path = temp_file.name
+            audio_bytes = utils.video_to_audio(video_bytes, audio_path)
+            print("starting TTS")
             await text_to_speech(translated_text, audio_path)
+            print("finished TTS", audio_path)
+            return FileResponse(audio_path, media_type="audio/wav", filename="output_adio")
 
-            os.chdir('Wav2Lip')
+            # return FileResponse()
+            # os.chdir('Wav2Lip')
     
-            subprocess.run([
-                'python', 'inference.py',
-                '--checkpoint_path', 'checkpoints/wav2lip.pth',
-                '--face', video_path,
-                '--audio', audio_path,
-                '--outfile', output_path
-            ], check=True)
+            # subprocess.run([
+            #     'python', 'inference.py',
+            #     '--checkpoint_path', 'checkpoints/wav2lip.pth',
+            #     '--face', video_path,
+            #     '--audio', audio_path,
+            #     '--outfile', output_path
+            # ], check=True)
 
-            return FileResponse(output_path, media_type='video/mp4', filename='result.mp4')
+            # return FileResponse(output_path, media_type='video/mp4', filename='result.mp4')
     except subprocess.CalledProcessError as e:
         raise HTTPException(status_code=500, detail=str(e))
     
-    finally:
-        os.chdir('..')
+    # finally:
+    #     if os.path.exists(audio_path):
+    #         os.remove(audio_path)
+        # os.chdir('..')
 
 
 
 async def text_to_speech(text, audio_output_path):
     from gtts import gTTS
-    tts = gTTS(text)
-    tts.save(audio_output_path)
+    try:
+        tts = gTTS(text)
+        tts.save(audio_output_path)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
         
 if __name__ == "__main__":
     import uvicorn

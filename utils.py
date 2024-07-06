@@ -1,6 +1,6 @@
 import ffmpeg
 import io
-from TTS.api import TTS
+# from TTS.api import TTS
 import torch
 from googletrans import Translator
 import uuid
@@ -8,7 +8,7 @@ import uuid
 translator = Translator()
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
-tts = TTS("tts_models/multilingual/multi-dataset/xtts_v2").to(device)
+# tts = TTS("tts_models/multilingual/multi-dataset/xtts_v2").to(device)
 
 
 # def video_to_audio(input_file, output_file_path):
@@ -42,6 +42,7 @@ def video_to_audio(input_bytes: bytes, output_file_path: str):
 
     stdout, stderr = process.communicate(input=input_bytes)
     if process.returncode != 0:
+        print("STDERR: ", stderr)
         raise ffmpeg.Error('ffmpeg', process.returncode, stderr)
 
 def audio_to_text(model, audio_file_path: str, language: str) -> str:
@@ -53,6 +54,6 @@ def translate(text: str, target_language: str):
     return translated.text
 
 
-def text_to_audio(text: str, language: str, speaker_wav: str):
-    tts.tts_to_file(text=text, language=language, speaker_wav=speaker_wav, file_path="temp/output.wav")
-    
+# def text_to_audio(text: str, language: str, speaker_wav: str):
+    # tts.tts_to_file(text=text, language=language, speaker_wav=speaker_wav, file_path="temp/output.wav")
+    # 
