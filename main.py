@@ -91,7 +91,7 @@ class TranslateRequest(BaseModel):
 
 @app.post("/translate")
 async def translate_fn(translationRequest: TranslateRequest):
-    return TranscribeResponse(
+    return TranslateResponse(
         id=translationRequest.id,
         toLang=translationRequest.toLang,
         translation=utils.translate(translationRequest.captions, translationRequest.toLang),
