@@ -118,11 +118,12 @@ async def synthesise(video: UploadFile = File(...), translated_text: Optional[st
         video_bytes = await video.read()
         with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as temp_file:
             audio_path = temp_file.name
-            audio_bytes = utils.video_to_audio(video_bytes, audio_path)
-            print("starting TTS")
+
+            # audio_bytes = utils.video_to_audio(video_bytes, audio_path)
+            # print("starting TTS")
             await text_to_speech(translated_text, audio_path)
-            print("finished TTS", audio_path)
-            return FileResponse(audio_path, media_type="audio/wav", filename="output_adio")
+            # print("finished TTS", audio_path)
+            return FileResponse(path=audio_path, media_type="audio/wav", filename="output_audio.wav")
 
             # return FileResponse()
             # os.chdir('Wav2Lip')
