@@ -2,14 +2,22 @@ import ffmpeg
 import io
 # from TTS.api import TTS
 import torch
-from googletrans import Translator
+# from googletrans import Translator
+from deep_translator import GoogleTranslator
 import uuid
+import os
+from elevenlabs.client import ElevenLabs
+from elevenlabs import VoiceSettings, play
 
-translator = Translator()
+elClient = ElevenLabs(
+    api_key="",
+)
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
-# tts = TTS("tts_models/multilingual/multi-dataset/xtts_v2").to(device)
+# translator = GoogleTranslator(source='auto', target='en')
+translator = GoogleTranslator(source='auto')
 
+# tts = TTS("tts_models/multilingual/multi-dataset/xtts_v2").to(device)
 
 # def video_to_audio(input_file, output_file_path):
 #     # stream = ffmpeg.input(input_file)
@@ -33,6 +41,7 @@ def generate_id() -> str:
 
 def video_to_audio(input_bytes: bytes, output_file_path: str):
     # Use ffmpeg to convert video bytes to audio bytes
+
     process = (
         ffmpeg
         .input('pipe:0')
@@ -49,11 +58,23 @@ def audio_to_text(model, audio_file_path: str, language: str) -> str:
     result = model.transcribe(audio=audio_file_path, language=language)
     return result["text"]
 
-def translate(text: str, target_language: str):
-    translated = translator.translate(text, dest=target_language)
-    return translated.text
 
+def translate(text: str, target_language: str):
+    translator.target = target_language
+    translated = translator.translate(text)  # output -> Weiter so
+    return translated
+
+def generateVoice(id: str, text: str):
+    voice = elClient.clone(
+        name=id,
+        description="",
+        files=[f"temp/{id}.wav"],    
+    )
+    
+    audio = elClient.generate(text=text, voice=voice)
+    return audio
 
 # def text_to_audio(text: str, language: str, speaker_wav: str):
     # tts.tts_to_file(text=text, language=language, speaker_wav=speaker_wav, file_path="temp/output.wav")
     # 
+

@@ -9,11 +9,10 @@ import tempfile
 import whisper
 import utils
 import aiofiles
-from google.cloud import translate_v2 as translate
 import os
 import subprocess
 import shutil
-import whisper
+from elevenlabs import save
 
 
 class TranscribeRequest(BaseModel):
@@ -33,6 +32,15 @@ class TranslateResponse(BaseModel):
     id: str
     toLang: str
     translation: str
+
+class GenerateRequest(BaseModel):
+    id: str
+    toLang: str
+    translation: str
+
+class GenerateResponse(BaseModel):
+    id: str
+    url: str
 
 
 
@@ -57,42 +65,34 @@ def index():
     return {'message': 'This is the homepage of the API '}
 
 
-@app.post("/transcribe/")
-async def transcribe(video: UploadFile = File(...), fromLang: str = Form(...)):
-    video_bytes = await video.read()
-    id = utils.generate_id()
 
-    utils.video_to_audio(video_bytes, f"temp/{id}.wav")
+
+@app.post("/transcribe")
+async def transcribe(video: UploadFile = File(...)):
+    video_bytes = await video.read()
+
+    id = utils.generate_id()
+    
+    audio_file_path = f"temp/{id}.wav"
+    video_file_path = f"temp/{id}.mp4"
+
+    with open(video_file_path, "wb") as video_file:
+        video_file.write(video_bytes)
+
+    utils.video_to_audio(video_bytes, audio_file_path)
+    result = model.transcribe(audio=audio_file_path)
+
     return TranscribeResponse(
         id=id,
-        captions=utils.audio_to_text(models["transcriber"], f"temp/{id}.wav", fromLang),
+        captions=result["text"]
     )
-
-@app.post("/transcribe_text")
-async def transcribe_text(video: UploadFile = File(...)):
-    video_bytes = await video.read()
-
-    id = utils.generate_id()
-    with tempfile.TemporaryDirectory() as temp_dir:
-        audio_path = os.path.join(temp_dir, f"{id}.wav")
-        audio_bytes = utils.video_to_audio(video_bytes, audio_path)
-        # audio_path.write(audio_bytes)
-        # audio_path.seek(0)
     
-        result = model.transcribe(audio=audio_path)
-
-    return result["text"]
-    
-
-class TranslateRequest(BaseModel):
-    text: str
-    target_language: str
-
 
 @app.post("/translate")
 async def translate_fn(translationRequest: TranslateRequest):
+    id = utils.generate_id()
     return TranslateResponse(
-        id=translationRequest.id,
+        id=id,
         toLang=translationRequest.toLang,
         translation=utils.translate(translationRequest.captions, translationRequest.toLang),
     )
@@ -110,20 +110,35 @@ async def translate_fn(translationRequest: TranslateRequest):
 #     translated_text: Optional[str] = ""
 
 # TODO: WIP not yet tested due to package instabilities
-@app.post("/synthesise")
-async def synthesise(video: UploadFile = File(...), translated_text: Optional[str] = Form("")):
 
+@app.post("/generate")
+async def generate(generateRequest: GenerateRequest):
+    id = generateRequest.id
+    translated_text = generateRequest.translation
+    toLang = generateRequest.toLang
     try:
-        id = utils.generate_id()
-        video_bytes = await video.read()
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as temp_file:
-            audio_path = temp_file.name
+        video_file_path = f"temp/{id}.mp4"
+        audio_file_path = f"temp/{id}.wav"
 
-            # audio_bytes = utils.video_to_audio(video_bytes, audio_path)
-            # print("starting TTS")
-            await text_to_speech(translated_text, audio_path)
-            # print("finished TTS", audio_path)
-            return FileResponse(path=audio_path, media_type="audio/wav", filename="output_audio.wav")
+        video = None
+        audio = None
+        if os.path.isfile(video_file_path):
+            video = open(video_file_path, "rb")
+        if os.path.isfile(audio_file_path):
+            audio = open(audio_file_path, "rb")
+        
+        if video is None:
+            raise HTTPException(status_code=404, detail="Video not found")
+        if audio is None:
+            raise HTTPException(status_code=404, detail="Audio not found")
+        
+        generatedAudioPath = f"temp/{id}_generated.wav"
+        audioBytes = utils.generateVoice(id=id, text=translated_text)
+
+        save(audioBytes, generatedAudioPath)
+        
+        # print("finished TTS", audio_path)
+        # return FileResponse(path=, media_type="audio/wav", filename="output_audio.wav")
 
             # return FileResponse()
             # os.chdir('Wav2Lip')
@@ -138,7 +153,7 @@ async def synthesise(video: UploadFile = File(...), translated_text: Optional[st
 
             # return FileResponse(output_path, media_type='video/mp4', filename='result.mp4')
     except subprocess.CalledProcessError as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=4, detail=str(e))
     
     # finally:
     #     if os.path.exists(audio_path):
