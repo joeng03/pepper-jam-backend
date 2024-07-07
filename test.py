@@ -32,19 +32,3 @@
 # audio = elClient.generate(text="Hi! I'm a cloned voice!", voice=voice)
 
 # play(audio)
-
-import librosa
-import soundfile as sf
-import numpy
-from pydub import AudioSegment
-
-def change_audio_speed(file_path, speed=1.0):
-    # y, sr = librosa.load(file_path)
-    sound = AudioSegment.from_file(file_path)
-
-    # y_fast = librosa.effects.time_stretch(y, speed)
-    # new_file_path = f"modified_{file_path}"
-    # sf.write(new_file_path, y_fast, sr)
-    # return new_file_path
-
-change_audio_speed("temp/2cabddd0-9a80-4b41-91e2-be9f36da0f57_generated.wav", 1.5)
