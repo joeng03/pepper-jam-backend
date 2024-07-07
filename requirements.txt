@@ -122,8 +122,7 @@ starlette==0.37.2
 sympy==1.12.1
 threadpoolctl==3.5.0
 torch==2.3.0
-torchvision==2.3.0
-tornado==6.4.1
+dtornado==6.4.1
 tqdm==4.66.4
 traitlets==5.14.3
 typer==0.12.3
