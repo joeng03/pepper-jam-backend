@@ -1,6 +1,7 @@
 from typing import Optional
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from fastapi import FastAPI, APIRouter, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 import io
 from pydantic import BaseModel
@@ -13,6 +14,9 @@ import os
 import subprocess
 import shutil
 from elevenlabs import save
+
+
+
 
 
 class TranscribeRequest(BaseModel):
@@ -56,19 +60,34 @@ async def lifespan(app: FastAPI):
     yield
     models.clear()
 
-model = whisper.load_model("small")
+origins = [
+    "http://localhost:3000"
+]
 
+api_router = APIRouter(prefix="/api")
 app = FastAPI(lifespan=lifespan)
 
-@app.get('/')
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+
+@api_router.get('/')
 def index():
+# List of allowed origins
+
     return {'message': 'This is the homepage of the API '}
 
 
 
 
-@app.post("/transcribe")
-async def transcribe(video: UploadFile = File(...)):
+@api_router.post("/upload")
+async def transcribe(video: UploadFile = File(...), fromLang: str = Form("...")):
     video_bytes = await video.read()
 
     id = utils.generate_id()
@@ -80,15 +99,16 @@ async def transcribe(video: UploadFile = File(...)):
         video_file.write(video_bytes)
 
     utils.video_to_audio(video_bytes, audio_file_path)
-    result = model.transcribe(audio=audio_file_path)
+    result = models["transriber"].transcribe(audio=audio_file_path, language=fromLang)
 
+    print(result["text"])
     return TranscribeResponse(
         id=id,
-        captions=result["text"]
+        captions=result["text"],
     )
     
 
-@app.post("/translate")
+@api_router.post("/translate")
 async def translate_fn(translationRequest: TranslateRequest):
     id = utils.generate_id()
     return TranslateResponse(
@@ -111,7 +131,18 @@ async def translate_fn(translationRequest: TranslateRequest):
 
 # TODO: WIP not yet tested due to package instabilities
 
-@app.post("/generate")
+
+class TestResponse(BaseModel):
+    response: str
+
+@api_router.get("/test")
+async def test():
+    # return TestResponse(
+    #     response="Hello World"
+    # )
+    return FileResponse("temp/8d573a6e-a864-4cb9-99e0-d31c43889d66_generated.wav", media_type="audio/wav", filename="output_audio.wav")
+
+@api_router.post("/generate")
 async def generate(generateRequest: GenerateRequest):
     id = generateRequest.id
     translated_text = generateRequest.translation
@@ -126,40 +157,25 @@ async def generate(generateRequest: GenerateRequest):
             video = open(video_file_path, "rb")
         if os.path.isfile(audio_file_path):
             audio = open(audio_file_path, "rb")
-        
+
         if video is None:
             raise HTTPException(status_code=404, detail="Video not found")
         if audio is None:
             raise HTTPException(status_code=404, detail="Audio not found")
-        
+
         generatedAudioPath = f"temp/{id}_generated.wav"
+        generatedVideoPath = f"temp/{id}_generated.mp4"
         audioBytes = utils.generateVoice(id=id, text=translated_text)
 
         save(audioBytes, generatedAudioPath)
-        
-        # print("finished TTS", audio_path)
-        # return FileResponse(path=, media_type="audio/wav", filename="output_audio.wav")
 
-            # return FileResponse()
-            # os.chdir('Wav2Lip')
-    
-            # subprocess.run([
-            #     'python', 'inference.py',
-            #     '--checkpoint_path', 'checkpoints/wav2lip.pth',
-            #     '--face', video_path,
-            #     '--audio', audio_path,
-            #     '--outfile', output_path
-            # ], check=True)
+        utils.replace_audio(video_file_path, generatedAudioPath, generatedVideoPath)
 
-            # return FileResponse(output_path, media_type='video/mp4', filename='result.mp4')
+        return FileResponse(
+            generatedVideoPath, media_type="video/mp4", filename="output_video.mp4"
+        )
     except subprocess.CalledProcessError as e:
         raise HTTPException(status_code=4, detail=str(e))
-    
-    # finally:
-    #     if os.path.exists(audio_path):
-    #         os.remove(audio_path)
-        # os.chdir('..')
-
 
 
 async def text_to_speech(text, audio_output_path):
@@ -169,7 +185,11 @@ async def text_to_speech(text, audio_output_path):
         tts.save(audio_output_path)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-        
+    
+
+app.include_router(api_router)
+
+
 if __name__ == "__main__":
     import uvicorn
 

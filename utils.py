@@ -6,11 +6,14 @@ import torch
 from deep_translator import GoogleTranslator
 import uuid
 import os
+from moviepy.editor import VideoFileClip, AudioFileClip, CompositeAudioClip
+import pyrubberband as pyrb
+import soundfile as sf
 from elevenlabs.client import ElevenLabs
 from elevenlabs import VoiceSettings, play
 
 elClient = ElevenLabs(
-    api_key="",
+    api_key="102ce399cf07dc4356569a767fd8da11",
 )
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -73,6 +76,35 @@ def generateVoice(id: str, text: str):
     
     audio = elClient.generate(text=text, voice=voice)
     return audio
+
+
+
+def replace_audio(video_path, audio_path, output_path):
+    # Load the video
+    video = VideoFileClip(video_path)
+
+    # Calculate the duration ratio and adjust the audio speed
+    duration_ratio = AudioFileClip(audio_path).duration / video.duration  
+
+    y, sr = sf.read(audio_path)
+    # Play back at low speed
+    y_stretch = pyrb.time_stretch(y, sr, duration_ratio)
+
+    stretched_audio_path = f"{audio_path}_stretched.wav"
+    sf.write(stretched_audio_path, y_stretch, sr, format="wav")
+    # Load the adjusted audio
+    new_audio = AudioFileClip(stretched_audio_path)
+
+    # Set the new audio to the video
+    new_audio_clip = CompositeAudioClip([new_audio])
+    video.audio = new_audio_clip
+
+    # Write the result to a file
+    video.write_videofile(output_path, codec="libx264", audio_codec="aac")
+
+    # Clean up the temporary file
+    os.remove(stretched_audio_path)
+
 
 # def text_to_audio(text: str, language: str, speaker_wav: str):
     # tts.tts_to_file(text=text, language=language, speaker_wav=speaker_wav, file_path="temp/output.wav")
